@@ -2,7 +2,7 @@
 
 Open-source, **Android-native** proof of concept for using **Sign in with ChatGPT plan usage** instead of a separate paid OpenAI API key.
 
-**Status:** Source code provided for local build/device testing. OAuth + API success has **NOT yet been verified** on Samsung Z Fold3. GitHub repo must be published from an authenticated developer machine; this source package is not itself a GitHub repository.
+**Status:** Public repository is published. Source is ready for Codex to clone/build, but Android build, OAuth and inference have **NOT yet been verified** on Samsung Z Fold3.
 
 ## What is implemented
 
@@ -27,7 +27,7 @@ Open-source, **Android-native** proof of concept for using **Sign in with ChatGP
 - Samsung Z Fold3 with Android USB/Wi-Fi debugging & ADB from Ubuntu (or an Android Emulator with Chrome).
 
 ```bash
-unzip ChatGPT-Subscription-Android-POC.zip
+git clone https://github.com/khuongnd0901/ChatGPT-Subscription-Android-POC.git
 cd ChatGPT-Subscription-Android-POC
 export ANDROID_HOME="$HOME/Android/Sdk"  # change if necessary
 ./gradlew :app:assembleDebug
@@ -46,17 +46,11 @@ For a combined build + deployment on Ubuntu:
 ADB_SERIAL=192.168.1.10:5555 ./scripts/install-zfold3.sh
 ```
 
-## Publish as a NEW public GitHub repository
+## Repository and Codex workflow
 
-The following command **makes the source public** (never place credentials in source files):
+This repository is **already published** at https://github.com/khuongnd0901/ChatGPT-Subscription-Android-POC. Clone it and run Codex from its root; see `AGENTS.md` and `docs/CODEX_PROMPT.md`.
 
-```bash
-# If missing: install https://cli.github.com/ and run gh auth login
-./scripts/publish-gh.sh
-# Publishes to: https://github.com/khuongnd0901/ChatGPT-Subscription-Android-POC
-```
-
-This publication step is required because the installed GitHub integration supports repository writes but not **repository creation**. The script never pushes to any of the existing DeX app repos.
+`./scripts/publish-gh.sh` is a historical create-repository helper and is **not needed** for this repo. To push verified fixes, use `git add`, `git commit`, and `git push` with your authenticated GitHub account. Do not modify existing DeX repositories.
 
 ## Device acceptance test
 
