@@ -12,8 +12,8 @@ class ApiException(val statusCode: Int, message: String) : Exception("HTTP $stat
 
 /** HTTPS-only network client: never print Authorization headers, request bodies or tokens. */
 object HttpClient {
-    fun getJson(url: String, bearer: String? = null): JSONObject {
-        return requestJson(url, "GET", bearer, null, null)
+    fun getJson(url: String, bearer: String? = null, onStatus: (Int) -> Unit = {}): JSONObject {
+        return requestJson(url, "GET", bearer, null, null, onStatus)
     }
 
     fun postForm(url: String, fields: Map<String, String>): JSONObject {
@@ -24,7 +24,8 @@ object HttpClient {
     }
 
     fun requestJson(
-        url: String, method: String, bearer: String?, contentType: String?, body: ByteArray?
+        url: String, method: String, bearer: String?, contentType: String?, body: ByteArray?,
+        onStatus: (Int) -> Unit = {}
     ): JSONObject {
         val conn = connection(url, method, bearer)
         return try {
@@ -34,9 +35,12 @@ object HttpClient {
                 conn.outputStream.use { it.write(body) }
             }
             val status = conn.responseCode
+            onStatus(status)
             val response = readLimited(if (status in 200..299) conn.inputStream else conn.errorStream)
             if (status !in 200..299) throw ApiException(status, safeMessage(response))
-            JSONObject(response)
+            try { JSONObject(response) } catch (_: org.json.JSONException) {
+                error("Invalid JSON response (body hidden)")
+            }
         } finally {
             conn.disconnect()
         }
@@ -47,7 +51,8 @@ object HttpClient {
         model: String,
         prompt: String,
         onDelta: (String) -> Unit,
-        onEvent: (String) -> Unit
+        onEvent: (String) -> Unit,
+        onStatus: (Int) -> Unit = {}
     ) {
         val input = org.json.JSONArray().put(
             JSONObject().put("role", "user").put("content", prompt)
@@ -68,6 +73,7 @@ object HttpClient {
             conn.doOutput = true
             conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
             val status = conn.responseCode
+            onStatus(status)
             if (status !in 200..299) {
                 throw ApiException(status, safeMessage(readLimited(conn.errorStream)))
             }
@@ -121,9 +127,15 @@ object HttpClient {
     private fun readLimited(stream: InputStream?): String {
         if (stream == null) return "(empty response)"
         return stream.bufferedReader(Charsets.UTF_8).use { reader ->
+            val body = StringBuilder()
             val chars = CharArray(8192)
-            val n = reader.read(chars)
-            if (n < 0) "" else String(chars, 0, n)
+            while (true) {
+                val n = reader.read(chars)
+                if (n < 0) break
+                require(body.length + n <= 1_048_576) { "HTTP response exceeds size limit" }
+                body.append(chars, 0, n)
+            }
+            body.toString()
         }
     }
 
@@ -133,8 +145,7 @@ object HttpClient {
             val j = JSONObject(response)
             val e = j.optJSONObject("error")
             val code = e?.optString("code") ?: j.optString("code", "request_failed")
-            val message = e?.optString("message") ?: j.optString("message", "")
-            "$code ${message.take(220)}"
+            if (code.matches(Regex("[A-Za-z0-9_.-]{1,80}"))) code else "request_failed"
         } catch (_: Exception) {
             "Request failed (non-JSON response)"
         }

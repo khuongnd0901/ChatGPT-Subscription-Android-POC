@@ -87,10 +87,10 @@ class SiwcAuth(private val store: SecureStore) {
         }
     }
 
-    fun freshSession(): ChatGptSession {
+    fun freshSession(forceRefresh: Boolean = false): ChatGptSession {
         val current = store.load() ?: error("Not signed in")
         require(current.hasSubscriptionScope()) { "Subscription scope not granted" }
-        if (current.expiresAt > System.currentTimeMillis() + 120_000) return current
+        if (!forceRefresh && current.expiresAt > System.currentTimeMillis() + 120_000) return current
         require(current.refreshToken.isNotBlank()) { "Refresh token missing, sign in again" }
         val j = HttpClient.postForm(
             TOKEN_URL,

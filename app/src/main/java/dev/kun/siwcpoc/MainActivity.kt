@@ -30,6 +30,7 @@ class MainActivity : Activity() {
     private lateinit var signIn: Button
     private lateinit var listModels: Button
     private lateinit var send: Button
+    private lateinit var refresh: Button
     private lateinit var signOut: Button
     private val executor = Executors.newSingleThreadExecutor()
     private var modelIds: List<String> = emptyList()
@@ -79,7 +80,8 @@ class MainActivity : Activity() {
         listModels = addButton(root, "Fetch models (/v1/models)") {
             task("Fetching account model catalog...") {
                 val token = auth.freshSession().accessToken
-                val response = HttpClient.getJson("https://api.openai.com/v1/models", token)
+                var httpStatus = 0
+                val response = HttpClient.getJson("https://api.openai.com/v1/models", token) { httpStatus = it }
                 val items = response.getJSONArray("models")
                 val slugs = mutableListOf<String>()
                 val names = mutableListOf<String>()
@@ -97,7 +99,7 @@ class MainActivity : Activity() {
                     )
                     adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                     modelSpinner.adapter = adapter
-                    status.text = "Model catalog loaded: ${slugs.size} visible models"
+                    status.text = "HTTP $httpStatus: Model catalog loaded: ${slugs.size} visible models"
                 }
             }
         }
@@ -127,10 +129,18 @@ class MainActivity : Activity() {
             output.text = ""
             task("Streaming response from $selectedModel...") {
                 val token = auth.freshSession().accessToken
+                var httpStatus = 0
                 HttpClient.streamResponses(token, selectedModel, text,
                     onDelta = { delta -> runOnUiThread { output.append(delta) } },
-                    onEvent = { event -> runOnUiThread { status.text = "PASS: $event ($selectedModel)" } }
+                    onEvent = { event -> runOnUiThread { status.text = "PASS: HTTP $httpStatus; $event ($selectedModel)" } },
+                    onStatus = { httpStatus = it }
                 )
+            }
+        }
+        refresh = addButton(root, "Refresh session (test token rotation)") {
+            task("Refreshing OAuth session...") {
+                auth.freshSession(forceRefresh = true)
+                runOnUiThread { status.text = "PASS: Token refresh; subscription scope retained. Fetch models to verify." }
             }
         }
         signOut = addButton(root, "Sign out / clear encrypted credentials") {
@@ -169,7 +179,9 @@ class MainActivity : Activity() {
             try {
                 body()
             } catch (e: Exception) {
-                runOnUiThread { status.text = "FAIL: ${e.message?.take(250) ?: e.javaClass.simpleName}" }
+                runOnUiThread { status.text = "FAIL ($description): " +
+                    if (e is org.json.JSONException) "Invalid JSON (body hidden)"
+                    else (e.message?.take(250) ?: e.javaClass.simpleName) }
             } finally {
                 runOnUiThread {
                     running = false
@@ -183,6 +195,7 @@ class MainActivity : Activity() {
         signIn.isEnabled = enabled
         listModels.isEnabled = enabled
         send.isEnabled = enabled
+        refresh.isEnabled = enabled
         signOut.isEnabled = enabled
     }
 
