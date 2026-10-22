@@ -2,7 +2,7 @@
 
 Open-source, **Android-native** proof of concept for using **Sign in with ChatGPT plan usage** instead of a separate paid OpenAI API key.
 
-**Status:** Public repository is published. Source is ready for Codex to clone/build, but Android build, OAuth and inference have **NOT yet been verified** on Samsung Z Fold3.
+**Status:** Verified on a real Samsung Z Fold3 running Android 15 / One UI 7 in DeX on 2026-10-22. Browser OAuth, signed ID-token validation, subscription scope, model retrieval, HTTP 200 inference ending in `response.completed`, forced refresh, session persistence, and local sign-out passed. See [device test report](docs/DEVICE_TEST_REPORT.md) for evidence and limits.
 
 ## What is implemented
 
@@ -60,8 +60,9 @@ This repository is **already published** at https://github.com/khuongnd0901/Chat
 4. Tap **Fetch models**; verify list is populated for current ChatGPT account.
 5. Choose a model, type a Vietnamese prompt, tap **Run inference**. Observe streamed output and **`PASS: response.completed`**.
 6. Close and reopen app: encrypted session should survive. Try Fetch models again (refresh may run).
-7. Tap Sign out: credentials cleared, model picker cleared.
-8. Test declined consent, offline/network error, invalid scope, expiry/refresh and browser timeout.
+7. Tap **Refresh session (test token rotation)** to exercise refresh immediately; fetch models and run inference again. The test does not inspect secret values to compare rotated tokens.
+8. Tap Sign out: credentials cleared, model picker cleared.
+9. Test declined consent, offline/network error, invalid scope, expiry/refresh and browser timeout.
 
 **PASS criteria:** authorized ChatGPT plan, model list available, stream finishes via `response.completed`, with **no API key** and no API billing key configured. Failed or missing scope is **FAIL**, not a reason to bypass authorization.
 
@@ -71,7 +72,7 @@ This repository is **already published** at https://github.com/khuongnd0901/Chat
 - On some Android/browser configurations, the system browser may not reach `127.0.0.1` loopback, or Android network policies can interfere. Capture evidence and treat as FAIL pending remediation. Keep callback HTTP loopback as officially documented; do not secretly swap to `chatgpt.com/backend-api`.
 - One selected account per POC install. Multi-account/profile management and revocation endpoint are out of scope. Sign out clears **local credentials**, not server-side grants.
 - Only RS256 supported for ID token signature in current POC. If OpenAI changes signing algorithm, explicitly update verifier against live OIDC discovery; do **not** skip signature checks.
-- Token refresh is implemented but not yet device-tested against a real issued dynamic client. If refresh returns an ID token, this POC deliberately retains the previously validated account hint instead of replacing it without verification.
+- Token refresh was device-tested with a real issued dynamic client, followed by successful model retrieval and inference after an app restart. If refresh returns an ID token, this POC deliberately retains the previously validated account hint instead of replacing it without verification.
 - Unsupported plan-use features (at time of writing): audio/video input, Files upload, image generation, hosted tools like Code Interpreter, `previous_response_id` HTTP continuation. For DeX voice apps, STT/TTS must be separate.
 - Preview protocol may change; use the linked official docs before merging into other apps.
 - This is a research POC, not a production-ready reusable authentication SDK.
